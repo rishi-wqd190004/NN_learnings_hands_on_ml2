@@ -4,6 +4,7 @@ import os, time
 import matplotlib.pyplot as plt
 import numpy as np
 
+root_dir = os.path.join(os.curdir, 'logs/fit/')
 
 (train_images, train_labels), (test_images, test_labels) = keras.datasets.cifar10.load_data()
 
@@ -26,10 +27,10 @@ for i, (image, label) in enumerate(train_ds.take(5)):
     plt.axis('off')
 #plt.show()
 ## normalize and standardize the images
-## then resize the image from 32x32 to 227x227 as AlexNet wants in 227x227 size
+## then resize the image from 32x32 to 64x64 ------------##227x227 as AlexNet wants in 227x227 size
 def preprocess_image(image, label):
     image = tf.image.per_image_standardization(image)
-    image = tf.image.resize(image, (227,227))
+    image = tf.image.resize(image, (64,64))
     return image, label
 
 train_ds_size = tf.data.experimental.cardinality(train_ds).numpy()
@@ -45,36 +46,64 @@ train_ds = (train_ds
                     .shuffle(buffer_size=train_ds_size)
                     .batch(batch_size=32, drop_remainder=True))
 
-test_ds = (train_ds
+test_ds = (test_ds
                     .map(preprocess_image)
                     .shuffle(buffer_size=test_ds_size)
                     .batch(batch_size=32, drop_remainder=True))
                     
-valid_ds = (train_ds
+valid_ds = (valid_ds
                     .map(preprocess_image)
                     .shuffle(buffer_size=valid_ds_size)
                     .batch(batch_size=32, drop_remainder=True))
 
 # model implementation
-model = keras.models.Sequential([
-    keras.layers.Conv2D(filters=96, kernel_size=(11,11), strides=(4,4), activation='relu', input_shape=(227,227,3)),
+model=keras.models.Sequential([
+    keras.layers.Conv2D(filters=128, kernel_size=(11,11), strides=(4,4), activation='relu', input_shape=(64,64,3)),
     keras.layers.BatchNormalization(),
-    keras.layers.MaxPooling2D(pool_size=(3,3), strides=(2,2)),
-    keras.layers.Conv2D(filters=256, kernel_size=(5,5), strides=(1,1), activation='relu', padding='same'),
+    keras.layers.MaxPool2D(pool_size=(2,2)),
+    keras.layers.Conv2D(filters=256, kernel_size=(5,5), strides=(1,1), activation='relu', padding="same"),
     keras.layers.BatchNormalization(),
-    keras.layers.MaxPooling2D(pool_size=(3,3), strides=(2,2)),
-    keras.layers.Conv2D(filters=348, kernel_size=(3,3), strides=(1,1), activation='relu', padding='same'),
+    keras.layers.MaxPool2D(pool_size=(3,3)),
+    keras.layers.Conv2D(filters=256, kernel_size=(3,3), strides=(1,1), activation='relu', padding="same"),
     keras.layers.BatchNormalization(),
-    keras.layers.Conv2D(filters=348, kernel_size=(3,3), strides=(1,1), activation='relu', padding='same'),
+    keras.layers.Conv2D(filters=256, kernel_size=(1,1), strides=(1,1), activation='relu', padding="same"),
     keras.layers.BatchNormalization(),
-    keras.layers.Conv2D(filters=256, kernel_size=(3,3), strides=(1,1), activation='relu', padding='same'),
+    keras.layers.Conv2D(filters=256, kernel_size=(1,1), strides=(1,1), activation='relu', padding="same"),
     keras.layers.BatchNormalization(),
-    keras.layers.MaxPooling2D(pool_size=(3,3), strides=(2,2)),
+    keras.layers.MaxPool2D(pool_size=(2,2)),
     keras.layers.Flatten(),
-    keras.layers.Dense(4096, activation='relu'),
+    keras.layers.Dense(1024,activation='relu'),
     keras.layers.Dropout(0.5),
-    keras.layers.Dense(4096, activation='relu'),
+    keras.layers.Dense(1024,activation='relu'),
     keras.layers.Dropout(0.5),
-    keras.layers.Dense(10, activation='softmax')
+    keras.layers.Dense(10,activation='softmax')  
 ])
-                 
+
+
+# adding support for tensorboard
+def get_run_logdir():
+    run_id = time.strftime("run_%Y_%m_%d-%H_%M_%S")
+    return os.path.join(root_dir, run_id)
+
+run_logdir = get_run_logdir()
+tensorboard_cb = keras.callbacks.TensorBoard(run_logdir)
+
+# compiling the model
+model.compile(
+    loss='sparse_categorical_crossentropy',
+    optimizer=tf.optimizers.SGD(learning_rate=0.001), 
+    metrics=['accuracy']
+)
+model.summary()
+
+
+# fitting the training data
+model.fit(
+    train_ds,
+    epochs=50,
+    validation_data=valid_ds,
+    validation_freq=1,
+    callbacks=[tensorboard_cb]
+)
+
+model.evaluate(test_ds)
