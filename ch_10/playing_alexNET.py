@@ -98,7 +98,7 @@ model.summary()
 
 
 # fitting the training data
-model.fit(
+hist = model.fit(
     train_ds,
     epochs=50,
     validation_data=valid_ds,
@@ -107,3 +107,5 @@ model.fit(
 )
 
 model.evaluate(test_ds)
+
+print("Accuracy score: ", np.max(hist.history['val_accuracy']))
