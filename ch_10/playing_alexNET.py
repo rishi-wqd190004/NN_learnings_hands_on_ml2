@@ -27,7 +27,7 @@ for i, (image, label) in enumerate(train_ds.take(5)):
     plt.axis('off')
 #plt.show()
 ## normalize and standardize the images
-## then resize the image from 32x32 to 64x64 ------------##227x227 as AlexNet wants in 227x227 size
+## then resize the image from 32x32 to 64x64
 def preprocess_image(image, label):
     image = tf.image.per_image_standardization(image)
     image = tf.image.resize(image, (64,64))
